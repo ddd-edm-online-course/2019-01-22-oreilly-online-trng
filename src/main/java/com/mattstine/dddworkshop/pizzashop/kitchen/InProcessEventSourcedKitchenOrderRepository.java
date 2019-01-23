@@ -10,6 +10,8 @@ import java.util.Map;
 
 final class InProcessEventSourcedKitchenOrderRepository extends InProcessEventSourcedRepository<KitchenOrderRef, KitchenOrder, KitchenOrder.OrderState, KitchenOrderEvent, KitchenOrderAddedEvent> implements KitchenOrderRepository {
 
+    Map<OnlineOrderRef, KitchenOrderRef> onlineOrderRefToKitchenOrderRef;
+
     InProcessEventSourcedKitchenOrderRepository(EventLog eventLog, Topic topic) {
         super(eventLog,
                 KitchenOrderRef.class,
@@ -17,10 +19,24 @@ final class InProcessEventSourcedKitchenOrderRepository extends InProcessEventSo
                 KitchenOrder.OrderState.class,
                 KitchenOrderAddedEvent.class,
                 topic);
+
+        onlineOrderRefToKitchenOrderRef = new HashMap<>();
+
+        eventLog.subscribe(new Topic("kitchen_orders"), e -> {
+            if (e instanceof KitchenOrderAddedEvent) {
+                KitchenOrderAddedEvent koae = (KitchenOrderAddedEvent) e;
+                onlineOrderRefToKitchenOrderRef
+                        .put(koae.getState().getOnlineOrderRef(), koae.getRef());
+            }
+        });
     }
 
     @Override
     public KitchenOrder findByOnlineOrderRef(OnlineOrderRef onlineOrderRef) {
+        KitchenOrderRef ref = onlineOrderRefToKitchenOrderRef.get(onlineOrderRef);
+        if (ref != null) {
+            return findByRef(ref);
+        }
         return null;
     }
 }
